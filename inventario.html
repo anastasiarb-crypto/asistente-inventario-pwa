@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!-- Configuración ESENCIAL para dispositivos móviles y PWA -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente de Inventario de Vinos</title>
+    
+    <!-- Incluye Tailwind CSS para un diseño moderno y responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define la fuente Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        /* Estilo para el contenedor principal, simulando una interfaz de app móvil */
+        .app-container {
+            max-width: 420px; /* Ancho típico de móvil */
+            width: 100%;
+            background-color: white;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
+            margin: 1rem 0;
+        }
+
+        /* Estilos de botones para un toque más app-like */
+        .action-button {
+            transition: all 0.2s;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .action-button:active {
+            transform: scale(0.98);
+            filter: brightness(0.9);
+        }
+
+        /* Estilo para el texto de advertencia de stock bajo */
+        .low-stock {
+            background-color: #fee2e2; /* Fondo rojo claro */
+            border-color: #ef4444; /* Borde rojo */
+            color: #b91c1c; /* Texto rojo oscuro */
+        }
+        .sufficient-stock {
+            background-color: #d1fae5; /* Fondo verde claro */
+            border-color: #10b981; /* Borde verde */
+            color: #065f46; /* Texto verde oscuro */
+        }
+
+        /* El color de alerta de stock actual se gestiona en JS con clases de Tailwind */
+        #stock-display-card {
+            min-height: 140px; /* Altura mínima para evitar CLS al cambiar colores */
+        }
+
+    </style>
+    
+    <!-- Configuración del Manifiesto de PWA (Integrado como Data URI) -->
+    <!-- Esto permite que los navegadores ofrezcan la opción de "Instalar App" -->
+    <link rel="manifest" href="data:application/json;base64,eyJpY29ucyI6IFt7InNyYyI6ICJodHRwczovL3BsYWNlaG9sZC5jby8xOTJ4MTkyLzM0ZGMzYy9mZmYifSwgeyJzcmMiOiAiaHR0cHM6Ly9wbGFjZWhvbGQuY28vNTEyeDUxMi8zNGRjM2MvZmZmIiwgInNpemVzIjogIjUxMng1MTIiLCAidHlwZSI6ICJpbWFnZS9wbmciLCAicHVycG9zZXMiOiAiYW55IG1hc2thYmxlIn1dLCJkZXNjcmlwdGlvbiI6ICJBcHAgcGFyYSBjb250cm9sIGRlIGludmVudGFyaW8gZGUgdmlub3MiLCJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCJuYW1lIjogIkFzaXN0ZW50ZSBkZSBWaW5vcyIsIm9yaWVudGF0aW9uIjogInBvcnRyYWl0Iiwgc2hvcnRfbmFtZSI6ICJWZWFzIE5vdyIsInRoZW1lX2NvbG9yIjogIiMzNGQzY2MiLCJzdGFydF91cmwiOiAiLi8ifQ==">
+</head>
+<body class="bg-gray-100">
+
+    <div class="app-container">
+        <h1 class="text-3xl font-extrabold text-center mb-6 text-indigo-700">
+            Asistente de Inventario
+        </h1>
+        <p class="text-center text-sm text-gray-500 mb-8">
+            Control rápido de stock por turno. (Datos temporales)
+        </p>
+
+        <!-- 1. Definición del Vino (Configuración Inicial) -->
+        <div id="config-panel" class="p-4 bg-indigo-50 border-2 border-indigo-200 rounded-xl shadow-inner mb-6">
+            <h2 class="text-xl font-semibold mb-3 text-indigo-800">1. Configuración de Botella</h2>
+            
+            <label for="wineName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Vino:</label>
+            <input type="text" id="wineName" value="Malbec Clásico"
+                   class="w-full p-3 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 mb-3"
+                   placeholder="Ej. Malbec Clásico">
+
+            <label for="initialStock" class="block text-sm font-medium text-gray-700 mb-1">Stock Inicial de Turno:</label>
+            <input type="number" id="initialStock" value="10" min="0"
+                   class="w-full p-3 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+                   placeholder="Ej. 10">
+            
+            <button id="setStockBtn" 
+                    class="w-full p-3 bg-indigo-600 text-white font-bold rounded-lg action-button hover:bg-indigo-700">
+                💾 Cargar Stock
+            </button>
+        </div>
+
+        <!-- 2. Indicador de Alerta y Stock Actual -->
+        <div id="stock-display-card" 
+             class="low-stock p-5 border-2 rounded-xl text-center shadow-md mb-6 transition-colors duration-500">
+            
+            <p id="wine-title-display" class="text-lg font-semibold mb-2">Vino: Malbec Clásico</p>
+            
+            <p class="text-xl font-medium">Stock Actual:</p>
+            <p id="currentStockDisplay" class="text-5xl font-extrabold my-2">10</p>
+            
+            <!-- Indicador de alerta de stock bajo -->
+            <p id="alertMessage" class="text-sm font-medium mt-3">¡Stock Suficiente!</p>
+        </div>
+
+        <!-- 3. Controles Rápidos (Venta y Reabastecimiento) -->
+        <div id="controls-panel" class="grid grid-cols-2 gap-4">
+            
+            <!-- Contador Rápido de Salida (Restar) -->
+            <button id="subtractBtn" 
+                    class="action-button bg-red-500 text-white p-4 rounded-xl text-lg font-bold hover:bg-red-600 shadow-lg">
+                <span class="text-2xl font-extrabold">-1</span> <br> Venta Registrada
+            </button>
+
+            <!-- Función de Reabastecimiento (Sumar) -->
+            <button id="addBtn" 
+                    class="action-button bg-green-500 text-white p-4 rounded-xl text-lg font-bold hover:bg-green-600 shadow-lg">
+                <span class="text-2xl font-extrabold">+1</span> <br> Añadir Stock
+            </button>
+        </div>
+        
+        <!-- 4. Registro de Cierre -->
+        <div class="mt-8 pt-4 border-t border-gray-200">
+            <button id="finalizeBtn" 
+                    class="w-full p-4 bg-gray-700 text-white font-bold rounded-lg action-button hover:bg-gray-800 shadow-md">
+                ✅ Finalizar Inventario de Turno
+            </button>
+            <p id="finalReport" class="mt-4 text-center text-sm text-gray-500 italic">
+                Presiona para ver el resumen final.
+            </p>
+        </div>
+        
+        <!-- Contenedor para mensajes modales (En lugar de alert()) -->
+        <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div id="modal-content" class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full">
+                <!-- Contenido del modal se inserta aquí -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Lógica de la Aplicación en JavaScript
+        
+        // Variables de estado
+        let currentStock = 0;
+        let wineName = "Vino de Ejemplo";
+        const LOW_STOCK_THRESHOLD = 3; // Límite para la alerta visual
+
+        // Referencias a elementos del DOM
+        const stockInput = document.getElementById('initialStock');
+        const nameInput = document.getElementById('wineName');
+        const currentStockDisplay = document.getElementById('currentStockDisplay');
+        const wineTitleDisplay = document.getElementById('wine-title-display');
+        const stockCard = document.getElementById('stock-display-card');
+        const alertMessage = document.getElementById('alertMessage');
+        const finalizeBtn = document.getElementById('finalizeBtn');
+        const finalReport = document.getElementById('finalReport');
+        const modalContainer = document.getElementById('modal-container');
+        const modalContent = document.getElementById('modal-content');
+
+        // --- FUNCIONES DE UTILIDAD ---
+
+        // Función para mostrar mensajes modales (reemplaza alert())
+        function showModal(title, message) {
+            modalContent.innerHTML = `
+                <h3 class="text-xl font-bold mb-3 text-indigo-700">${title}</h3>
+                <p class="text-gray-600 mb-4">${message}</p>
+                <button onclick="closeModal()" class="w-full p-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700">Cerrar</button>
+            `;
+            modalContainer.classList.remove('hidden');
+            modalContainer.classList.add('flex');
+        }
+
+        // Función para cerrar el modal
+        function closeModal() {
+            modalContainer.classList.remove('flex');
+            modalContainer.classList.add('hidden');
+        }
+
+
+        // Función para actualizar la interfaz de usuario
+        function updateUI() {
+            // Actualiza el stock visible
+            currentStockDisplay.textContent = currentStock;
+            
+            // Actualiza el nombre del vino
+            wineTitleDisplay.textContent = `Vino: ${wineName}`;
+
+            // Lógica de Alerta Visual (Stock Bajo/Suficiente)
+            // 1. Elimina clases previas
+            stockCard.classList.remove('low-stock', 'sufficient-stock');
+            
+            // 2. Aplica las nuevas clases según el umbral
+            if (currentStock <= LOW_STOCK_THRESHOLD) {
+                stockCard.classList.add('low-stock');
+                alertMessage.textContent = `¡ALERTA! Stock bajo (${currentStock} botellas).`;
+                // También usamos clases de Tailwind para el contraste
+                stockCard.classList.remove('text-green-900');
+                stockCard.classList.add('text-red-900');
+            } else {
+                stockCard.classList.add('sufficient-stock');
+                alertMessage.textContent = 'Stock Suficiente.';
+                // También usamos clases de Tailwind para el contraste
+                stockCard.classList.remove('text-red-900');
+                stockCard.classList.add('text-green-900');
+            }
+
+            // Deshabilita el botón de restar si el stock es cero
+            document.getElementById('subtractBtn').disabled = currentStock <= 0;
+            if (currentStock <= 0) {
+                 document.getElementById('subtractBtn').classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                 document.getElementById('subtractBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // --- LÓGICA DE LA APP ---
+
+        // 1. Inicialización (Se ejecuta solo al cargar la página)
+        function initializeApp() {
+            // Usamos los valores de los inputs como valores iniciales
+            const initialStockValue = parseInt(stockInput.value, 10);
+            const initialWineName = nameInput.value.trim();
+
+            if (!isNaN(initialStockValue) && initialStockValue >= 0) {
+                currentStock = initialStockValue;
+            } else {
+                // Valor por defecto seguro si el input está mal
+                currentStock = 0;
+                stockInput.value = 0; 
+            }
+            wineName = initialWineName || "Vino sin Nombre";
+
+            // La data es temporal y se reinicia, cumpliendo el requisito.
+            updateUI();
+        }
+
+        // 2. Manejador del botón "Cargar Stock"
+        document.getElementById('setStockBtn').addEventListener('click', () => {
+            initializeApp(); // Reinicia el inventario con los nuevos valores
+            showModal("Inventario Cargado", `El inventario para "${wineName}" ha sido establecido en ${currentStock} botellas.`);
+        });
+
+
+        // 3. Manejador del botón "Venta Registrada" (Restar)
+        document.getElementById('subtractBtn').addEventListener('click', () => {
+            if (currentStock > 0) {
+                currentStock--;
+                updateUI();
+            } else {
+                showModal("Advertencia de Stock", "No se puede restar más stock. Las existencias han llegado a 0.");
+            }
+        });
+
+        // 4. Manejador del botón "Añadir Stock" (Reabastecimiento)
+        document.getElementById('addBtn').addEventListener('click', () => {
+            currentStock++;
+            updateUI();
+        });
+
+        // 5. Manejador del botón "Finalizar Inventario"
+        finalizeBtn.addEventListener('click', () => {
+            const initial = parseInt(document.getElementById('initialStock').value, 10);
+            const sales = initial - currentStock;
+            
+            // Genera el reporte final
+            const reportMessage = `
+                <p class="font-bold text-lg mb-2 text-red-600">REPORTE DE CIERRE DE TURNO</p>
+                <ul class="list-disc list-inside space-y-1 text-left">
+                    <li>Nombre del Vino: <strong>${wineName}</strong></li>
+                    <li>Stock Inicial: <strong>${initial}</strong> botellas</li>
+                    <li>Ventas Estimadas: <strong>${Math.max(0, sales)}</strong> botellas</li>
+                    <li>Stock Final: <strong class="text-indigo-600">${currentStock}</strong> botellas</li>
+                </ul>
+                <p class="mt-4 text-sm italic">
+                    Este es el número final a reportar en tu sistema externo.
+                </p>
+            `;
+            
+            showModal("Inventario Finalizado", reportMessage);
+            finalReport.innerHTML = `⚠️ <strong class="text-indigo-600">Stock Final Reportado: ${currentStock} botellas.</strong> Por favor, regístralo antes de salir.`;
+        });
+
+
+        // 6. Registro del Service Worker (Para PWA)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // Nota: El archivo service-worker.js no está incluido en este archivo único, 
+                // pero el código de registro es necesario para una PWA.
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registrado con éxito:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Fallo el registro del Service Worker:', error);
+                    });
+            });
+        }
+        
+        // Inicializa la aplicación al cargar la página
+        window.onload = initializeApp;
+
+    </script>
+</body>
+</html>
